@@ -318,4 +318,181 @@ driversPage = function () {
   `;
 };
 
+/* VMZA WARSZAWA — LOGOWANIE NA NAZWĘ UŻYTKOWNIKA */
+
+function vmzaUsernameEmail(value) {
+  const username = String(value || '').trim().toLowerCase();
+
+  if (!/^[a-z0-9_]{3,30}$/.test(username)) {
+    throw new Error(
+      'Nazwa użytkownika: 3–30 znaków, litery a-z, cyfry lub _.'
+    );
+  }
+
+  return username + '@example.com';
+}
+
+renderAuth = function () {
+  if (!sb) {
+    authShell(
+      '<h1>Brak połączenia</h1>' +
+      '<p>Sprawdź konfigurację Supabase.</p>'
+    );
+    return;
+  }
+
+  const registering = authView === 'register';
+
+  authShell(`
+    <h1>${registering ? 'Rejestracja kierowcy' : 'Logowanie'}</h1>
+
+    <p class="muted">
+      ${registering
+        ? 'Utwórz konto i poczekaj na zatwierdzenie administratora.'
+        : 'Wprowadź nazwę użytkownika i hasło.'}
+    </p>
+
+    <form id="auth-form">
+      <div class="field">
+        <label>Nazwa użytkownika</label>
+        <input
+          name="username"
+          placeholder="np. kierowca123"
+          autocomplete="username"
+          minlength="3"
+          maxlength="30"
+          pattern="[a-zA-Z0-9_]+"
+          required
+        >
+      </div>
+
+      <div class="field">
+        <label>Hasło</label>
+        <input
+          name="password"
+          type="password"
+          minlength="8"
+          autocomplete="${registering ? 'new-password' : 'current-password'}"
+          required
+        >
+      </div>
+
+      ${registering ? `
+        <div class="field">
+          <label>Powtórz hasło</label>
+          <input
+            name="confirmPassword"
+            type="password"
+            minlength="8"
+            autocomplete="new-password"
+            required
+          >
+        </div>
+      ` : ''}
+
+      <button class="btn red" style="width:100%">
+        ${registering ? 'Utwórz konto' : 'Zaloguj'}
+      </button>
+    </form>
+
+    <div id="auth-message"></div>
+
+    <div class="actions" style="margin-top:14px">
+      <button class="btn small" data-auth="login">
+        Logowanie
+      </button>
+      <button class="btn small" data-auth="register">
+        Rejestracja
+      </button>
+    </div>
+  `);
+
+  document.querySelectorAll('[data-auth]').forEach(button => {
+    button.onclick = () => {
+      authView = button.dataset.auth;
+      renderAuth();
+    };
+  });
+
+  $('auth-form').onsubmit = async event => {
+    event.preventDefault();
+
+    const form = new FormData(event.target);
+    const username = String(form.get('username')).trim().toLowerCase();
+    const password = String(form.get('password') || '');
+    const confirmation = String(form.get('confirmPassword') || '');
+    const button = event.target.querySelector('button');
+
+    button.disabled = true;
+
+    try {
+      const email = vmzaUsernameEmail(username);
+
+      if (registering) {
+        if (password !== confirmation) {
+          throw new Error('Hasła nie są identyczne.');
+        }
+
+        const { data, error } = await sb.auth.signUp({
+          email,
+          password,
+          options: {
+            data: {
+              full_name: username,
+              username
+            }
+          }
+        });
+
+        if (error) throw error;
+
+        if (!data.session) {
+          throw new Error(
+            'Konto wymaga potwierdzenia. Wyłącz Confirm email w Supabase.'
+          );
+        }
+
+        await start();
+      } else {
+        const { error } = await sb.auth.signInWithPassword({
+          email,
+          password
+        });
+
+        if (error) throw error;
+
+        await start();
+      }
+    } catch (error) {
+      $('auth-message').innerHTML =
+        `<p class="error">${esc(error.message)}</p>`;
+    } finally {
+      button.disabled = false;
+    }
+  };
+};
+
+renderWaiting = function () {
+  authShell(`
+    <h1>
+      ${profile?.status === 'rejected'
+        ? 'Konto odrzucone'
+        : 'Oczekiwanie na zatwierdzenie'}
+    </h1>
+
+    <p>Administrator musi zatwierdzić Twoje konto.</p>
+    <p><b>${esc(profile?.full_name || '')}</b></p>
+
+    <div class="actions">
+      <button id="check" class="btn red">Sprawdź ponownie</button>
+      <button id="out" class="btn">Wyloguj</button>
+    </div>
+
+    <div id="notice-area"></div>
+  `);
+
+  $('check').onclick = refresh;
+  $('out').onclick = signOut;
+};
+
 start().catch(e=>{console.error(e);renderAuth()});
