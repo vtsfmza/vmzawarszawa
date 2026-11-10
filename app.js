@@ -495,4 +495,49 @@ renderWaiting = function () {
   $('out').onclick = signOut;
 };
 
+async function start() {
+  if (!sb) {
+    renderAuth();
+    return;
+  }
+
+  const {
+    data: { session: current },
+    error
+  } = await sb.auth.getSession();
+
+  if (error) throw error;
+
+  session = current;
+
+  if (!session) {
+    renderAuth();
+    return;
+  }
+
+  loading();
+
+  try {
+    await reload();
+  } catch (error) {
+    console.error(error);
+
+    authShell(`
+      <h1>Błąd połączenia</h1>
+      <p class="error">${esc(error.message)}</p>
+
+      <button class="btn" id="retry">
+        Spróbuj ponownie
+      </button>
+
+      <button class="btn" id="out">
+        Wyloguj
+      </button>
+    `);
+
+    $('retry').onclick = start;
+    $('out').onclick = signOut;
+  }
+}
+
 start().catch(e=>{console.error(e);renderAuth()});
