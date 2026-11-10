@@ -1,4 +1,4 @@
 window.VMZA_CONFIG = {
-  url: 'ADRES_SKOPIOWANY_Z_SUPABASE',
-  anonKey: 'https://cwoipbroitzjuwhbbdzv.supabase.co/rest/v1/'
+  url: 'https://cwoipbroitzjuwhbbdzv.supabase.co/rest/v1/',
+  anonKey: 'sb_publishable_LHnMhI-yJlEYhSCkjozg3Q_VPjBepIq'
 };
